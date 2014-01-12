@@ -31,9 +31,8 @@ lowering the volume on the 1st mp3 only
 Sample JSON file
 ===
 After save() is called, the AudioSrite object will generate at least 2 files
-    - One audio sprite file for each specified audio format
-    
-    - One data file containing JSON blob for programmatic control 
+- One audio sprite file for each specified audio format
+- One data file containing JSON blob for programmatic control 
 
     {"sounds":[
       {
