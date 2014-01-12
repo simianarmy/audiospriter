@@ -1,6 +1,7 @@
 from functools import partial
 import os
 import unittest
+import json
 from tempfile import NamedTemporaryFile
 from pydub import AudioSegment
 from audiosprite import AudioSprite
@@ -12,8 +13,10 @@ from audiosprite.exceptions import (
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
 class AudioSpriteTests(unittest.TestCase):
+
     def setUp(self):
-        self.sprite = AudioSprite()
+        self.sprite = AudioSprite('test1')
+        self.testout = 'sprite'
 
     def test_create(self):
         self.assertIsInstance(self.sprite, AudioSprite)
@@ -53,13 +56,26 @@ class AudioSpriteTests(unittest.TestCase):
     def test_save_supports_multiple_formats(self):
         self.sprite.addAudio(os.path.join(data_dir, 'bach.ogg'))
         self.sprite.addAudio(os.path.join(data_dir, 'test3.mp3'))
+        outfile = os.path.join(data_dir, self.testout)
+
+        self.assertTrue(self.sprite.save(data_dir, self.testout, formats=['mp4', 'ogg']))
+        exported = AudioSegment.from_file(outfile + '.mp4', 'mp4')
+        self.assertTrue(len(exported) > len(self.sprite._files[0]['seg']))
+        exported = AudioSegment.from_file(outfile + '.ogg', 'ogg')
+        self.assertTrue(len(exported) > len(self.sprite._files[0]['seg']))
+
+    def test_save_generates_datafile(self):
+        self.sprite.addAudio(os.path.join(data_dir, 'bach.ogg'))
+        self.sprite.addAudio(os.path.join(data_dir, 'test3.mp3'))
+        outfile = os.path.join(data_dir, self.testout)
 
         with NamedTemporaryFile('w+b') as tmp_file:
-            self.assertTrue(self.sprite.save(data_dir, tmp_file.name, formats=['mp4', 'ogg']))
-            exported = AudioSegment.from_file(tmp_file.name + '.mp4', 'mp4')
-            self.assertTrue(len(exported) > len(self.sprite._files[0]['seg']))
-            exported = AudioSegment.from_file(tmp_file.name + '.ogg', 'ogg')
-            self.assertTrue(len(exported) > len(self.sprite._files[0]['seg']))
+            self.assertTrue(self.sprite.save(data_dir, self.testout, formats=['ogg']))
+            with open(outfile + '.json', 'r') as jsonfile:
+                data = json.loads(jsonfile.read())
+                self.assertEqual(data['sprite_id'], self.sprite._id)
+                self.assertEqual(len(data['sounds']), 2)
+
 
 if __name__ == "__main__":
     import sys

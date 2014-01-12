@@ -1,4 +1,5 @@
 import os
+import json
 from pydub import AudioSegment
 
 from .exceptions import (
@@ -14,9 +15,10 @@ class AudioSprite(object):
         'ogg', 'mp3', 'mp4'
     ]
 
-    def __init__(self, data=None, *args, **kwargs):
+    def __init__(self, id, data=None, *args, **kwargs):
         self._data = data
         self._files = []
+        self._id = id
 
         super(AudioSprite, self).__init__(*args, **kwargs)
 
@@ -63,6 +65,14 @@ class AudioSprite(object):
         id3v2_version (string)
             Set ID3v2 version for tags. (default: '4')
         """
+        fileBase = os.path.join(saveDir, outfile)
+
+        if self._generateAudioSprite(fileBase, formats, bitrate, parameters, tags, id3v2_version): 
+            return self._generateDataFile(fileBase)
+
+        return False
+
+    def _generateAudioSprite(self, fileBase, formats, bitrate, parameters, tags, id3v2_version):
         out = self._files[0]['seg']
 
         # concat all teh sounds!
@@ -73,8 +83,43 @@ class AudioSprite(object):
             return False
 
         for fmt in formats:
-            fname = os.path.join(saveDir, outfile + '.' + fmt)
-            print 'Saving to ' + fname
+            fname = os.path.join(fileBase + '.' + fmt)
             out.export(fname, format=fmt, bitrate=bitrate, parameters=parameters, tags=tags, id3v2_version=id3v2_version) 
 
         return True
+
+    def _generateDataFile(self, fileBase):
+        # generate the JSON data and write to file
+        with open(fileBase + '.json', 'w') as outfile:
+            json.dump(self._genSpriteData(), outfile)
+
+        return True
+
+    def _genSpriteData(self):
+        data = {'sprite_id': self._id, 'sounds': []}
+        start = 0
+
+        for f in self._files:
+            sound_data = self._getSoundData(f)
+            data['start'] = start
+            data['sounds'].append(sound_data)
+            start += len(f['seg'])
+
+        return data
+
+    def _getSoundData(self, item):
+        seg = item['seg']
+
+        return {'file': item['path'], 
+                'duration': len(seg),
+                'duration_sec': seg.duration_seconds,
+                'channels': seg.channels,
+                'frame_rate': seg.frame_rate,
+                'frame_width': seg.frame_width,
+                'sample_width': seg.sample_width,
+                'rms': seg.rms,
+                #'dBFS': seg.dBFS,
+                'max': seg.max,
+                'max_amp': seg.max_possible_amplitude
+                }
+
