@@ -28,6 +28,12 @@ class AudioSprite(object):
     def __iter__(self):
         return (self._files[i] for i in xrange(len(self._files)))
 
+    def __getitem__(self, idx):
+        return self._files[idx]
+
+    def findIndexOf(self, path):
+        return map(lambda f: f['path'], self).index(path)
+
     def addAudio(self, filePath):
         """ Main interface for adding audio to the sprite.
         Takes any audio format that ffmpeg supports
@@ -40,6 +46,18 @@ class AudioSprite(object):
 
         self._files.append({'seg': seg, 'path': filePath})
 
+    def changeFileVolume(self, file_path, volume_change):
+        """
+        Changes a single file's volume by volume_change (+ or -)
+        Specify file by path
+        @return new gain value, -1 if not found
+        """
+        idx = self.findIndexOf(file_path)
+        if idx >= 0:
+            self._files[idx]['seg'] = self._files[idx]['seg'] + volume_change
+            return self._files[idx]['seg'].rms
+
+        return -1
 
     def save(self, saveDir, outfile, formats=EXPORT_FORMATS, bitrate=None, parameters=None, tags=None, id3v2_version='4'):
         """ Generates audiosprite files and control data JSON file
