@@ -34,7 +34,8 @@ After save() is called, the AudioSrite object will generate at least 2 files
 - One audio sprite file for each specified audio format
 - One data file containing JSON blob for programmatic control
 
-    `{"sounds":[
+    {
+   "sounds":[
       {
          "rms":2060,
          "file":"data/bach.ogg",
@@ -77,6 +78,6 @@ After save() is called, the AudioSrite object will generate at least 2 files
          "dBFS":-15.37269418022304,
          "sample_width":2
       }
-    ],
-    "sprite_id":"testclient"
-    }`
+   ],
+   "sprite_id":"testclient"
+}
