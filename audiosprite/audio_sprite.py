@@ -119,7 +119,7 @@ class AudioSprite(object):
 
         for f in self._files:
             sound_data = self._getSoundData(f)
-            data['start'] = start
+            sound_data['start'] = start
             data['sounds'].append(sound_data)
             start += len(f['seg'])
 
@@ -136,7 +136,7 @@ class AudioSprite(object):
                 'frame_width': seg.frame_width,
                 'sample_width': seg.sample_width,
                 'rms': seg.rms,
-                #'dBFS': seg.dBFS,
+                'dBFS': seg.dBFS,
                 'max': seg.max,
                 'max_amp': seg.max_possible_amplitude
                 }

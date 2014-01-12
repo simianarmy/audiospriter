@@ -81,20 +81,42 @@ class AudioSpriteTests(unittest.TestCase):
         self.sprite.addAudio(os.path.join(data_dir, 'test3.mp3'))
         outfile = os.path.join(data_dir, self.testout)
 
-        with NamedTemporaryFile('w+b') as tmp_file:
+        with open(outfile + '.json', 'r') as jsonfile:
             self.assertTrue(self.sprite.save(data_dir, self.testout, formats=['ogg']))
-            with open(outfile + '.json', 'r') as jsonfile:
-                data = json.loads(jsonfile.read())
-                self.assertEqual(data['sprite_id'], self.sprite._id)
-                self.assertEqual(len(data['sounds']), 2)
+            data = json.loads(jsonfile.read())
+            self.assertEqual(data['sprite_id'], self.sprite._id)
+            self.assertEqual(len(data['sounds']), 2)
+
+    def test_datafile_contains_start_per_sound(self):
+        self.sprite.addAudio(os.path.join(data_dir, 'bach.ogg'))
+        self.sprite.addAudio(os.path.join(data_dir, 'test3.mp3'))
+        self.sprite.save(data_dir, self.testout, formats=['ogg'])
+        outfile = os.path.join(data_dir, self.testout)
+
+        with open(outfile + '.json', 'r') as jsonfile:
+            data = json.loads(jsonfile.read())
+            for s in data['sounds']:
+                self.assertTrue(s['start'] >= 0)
 
     def test_assign_volume_to_single_file(self):
-        fpath = os.path.join(data_dir, 'bach.ogg')
+        fpath = os.path.join(data_dir, 'test1.mp3')
         self.sprite.addAudio(fpath)
         gain = self.sprite[0]['seg'].rms
         self.sprite.changeFileVolume(fpath, -2)
         self.assertTrue(self.sprite[0]['seg'].rms < gain)
 
+    def test_modified_volume_in_datafile(self):
+        fpath = os.path.join(data_dir, 'test1.mp3')
+        self.sprite.addAudio(fpath)
+        og_gain = self.sprite[0]['seg'].rms
+        self.sprite.changeFileVolume(fpath, -2)
+        self.sprite.save(data_dir, self.testout, formats=['ogg'])
+        outfile = os.path.join(data_dir, self.testout)
+
+        with open(outfile + '.json', 'r') as jsonfile:
+            data = json.loads(jsonfile.read())
+            self.assertTrue(og_gain > data['sounds'][0]['rms'])
+        
 
 if __name__ == "__main__":
     import sys
