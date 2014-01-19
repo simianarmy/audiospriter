@@ -2,6 +2,7 @@ from functools import partial
 import os
 import unittest
 import json
+import shutil
 from tempfile import NamedTemporaryFile
 from pydub import AudioSegment
 from audiosprite import AudioSprite
@@ -11,12 +12,21 @@ from audiosprite.exceptions import (
 
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
+export_dir = os.path.join(data_dir, 'out')
 
 class AudioSpriteTests(unittest.TestCase):
 
     def setUp(self):
         self.sprite = AudioSprite('test1')
         self.testout = 'sprite'
+
+    def tearDown(self):
+        if os.path.exists(export_dir):
+            shutil.rmtree(export_dir)
+        
+    def load_audio(self, fmt):
+        outfile = os.path.join(export_dir, fmt, self.testout)
+        return AudioSegment.from_file(outfile + '.' + fmt, fmt)
 
     def test_create(self):
         self.assertIsInstance(self.sprite, AudioSprite)
@@ -68,21 +78,21 @@ class AudioSpriteTests(unittest.TestCase):
     def test_save_supports_multiple_formats(self):
         self.sprite.addAudio(os.path.join(data_dir, 'bach.ogg'))
         self.sprite.addAudio(os.path.join(data_dir, 'test3.mp3'))
-        outfile = os.path.join(data_dir, self.testout)
+        outfile = os.path.join(export_dir, self.testout)
 
-        self.assertTrue(self.sprite.save(data_dir, self.testout, formats=['mp4', 'ogg']))
-        exported = AudioSegment.from_file(outfile + '.mp4', 'mp4')
+        self.assertTrue(self.sprite.save(export_dir, self.testout, formats=['mp4', 'ogg']))
+        exported = self.load_audio('mp4')
         self.assertTrue(len(exported) > len(self.sprite[0]['seg']))
-        exported = AudioSegment.from_file(outfile + '.ogg', 'ogg')
+        exported = self.load_audio('ogg')
         self.assertTrue(len(exported) > len(self.sprite[0]['seg']))
 
     def test_save_generates_datafile(self):
         self.sprite.addAudio(os.path.join(data_dir, 'bach.ogg'))
         self.sprite.addAudio(os.path.join(data_dir, 'test3.mp3'))
-        outfile = os.path.join(data_dir, self.testout)
+        outfile = os.path.join(export_dir, self.testout)
+        self.assertTrue(self.sprite.save(export_dir, self.testout, formats=['ogg']))
 
         with open(outfile + '.json', 'r') as jsonfile:
-            self.assertTrue(self.sprite.save(data_dir, self.testout, formats=['ogg']))
             data = json.loads(jsonfile.read())
             self.assertEqual(data['sprite_id'], self.sprite._id)
             self.assertEqual(len(data['sounds']), 2)
@@ -90,8 +100,8 @@ class AudioSpriteTests(unittest.TestCase):
     def test_datafile_contains_start_per_sound(self):
         self.sprite.addAudio(os.path.join(data_dir, 'bach.ogg'))
         self.sprite.addAudio(os.path.join(data_dir, 'test3.mp3'))
-        self.sprite.save(data_dir, self.testout, formats=['ogg'])
-        outfile = os.path.join(data_dir, self.testout)
+        self.sprite.save(export_dir, self.testout, formats=['ogg'])
+        outfile = os.path.join(export_dir, self.testout)
 
         with open(outfile + '.json', 'r') as jsonfile:
             data = json.loads(jsonfile.read())
@@ -108,14 +118,34 @@ class AudioSpriteTests(unittest.TestCase):
     def test_modified_volume_in_datafile(self):
         fpath = os.path.join(data_dir, 'test1.mp3')
         self.sprite.addAudio(fpath)
-        og_gain = self.sprite[0]['seg'].rms
+        og_gain = self.sprite[0]['seg'].rms 
         self.sprite.changeFileVolume(fpath, -2)
-        self.sprite.save(data_dir, self.testout, formats=['ogg'])
-        outfile = os.path.join(data_dir, self.testout)
+        self.sprite.save(export_dir, self.testout, formats=['ogg'])
+        outfile = os.path.join(export_dir, self.testout)
 
         with open(outfile + '.json', 'r') as jsonfile:
             data = json.loads(jsonfile.read())
             self.assertTrue(og_gain > data['sounds'][0]['rms'])
+
+    def test_generates_new_export_dir_if_none(self):
+        self.assertFalse(os.path.isdir(export_dir))
+
+        fpath = os.path.join(data_dir, 'test1.mp3')
+        self.sprite.addAudio(fpath)
+        self.sprite.save(export_dir, self.testout, formats=['ogg'])
+        self.assertTrue(os.path.isdir(export_dir))
+
+    def test_generates_export_dir_per_format(self):
+        fpath = os.path.join(data_dir, 'test1.mp3')
+        self.sprite.addAudio(fpath)
+        self.sprite.save(export_dir, self.testout, formats=['ogg'])
+        self.assertTrue(os.path.isdir(os.path.join(export_dir, 'ogg')))
+
+    def test_save_source_flag_genrates_files_per_format(self):
+        fpath = os.path.join(data_dir, 'test1.mp3')
+        self.sprite.addAudio(fpath)
+        self.sprite.save(export_dir, self.testout, formats=['ogg'], save_source=True)
+        self.assertTrue(os.path.exists(os.path.join(export_dir, 'ogg', 'test1.ogg')))
         
 
 if __name__ == "__main__":

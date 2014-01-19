@@ -44,7 +44,11 @@ class AudioSprite(object):
         except:
             raise InvalidSource("Invalid audio source: " + filePath)
 
-        self._files.append({'seg': seg, 'path': filePath})
+        self._files.append({
+            'id': os.path.splitext(os.path.basename(filePath))[0],
+            'seg': seg, 
+            'path': filePath
+            })
 
     def changeFileVolume(self, file_path, volume_change):
         """
@@ -59,7 +63,7 @@ class AudioSprite(object):
 
         return -1
 
-    def save(self, saveDir, outfile, formats=EXPORT_FORMATS, bitrate=None, parameters=None, tags=None, id3v2_version='4'):
+    def save(self, saveDir, outfile, formats=EXPORT_FORMATS, save_source=False, bitrate=None, parameters=None, tags=None, id3v2_version='4'):
         """ Generates audiosprite files and control data JSON file
 
         saveDir (string):
@@ -70,6 +74,9 @@ class AudioSprite(object):
 
         formats (list)
             Formats for destination audio file. ('mp3', 'mp4', 'ogg' or other ffmpeg/avconv supported files)
+
+        save_source (bool):
+            Generates 1 file per source per format when saving
 
         bitrate (string)
             Bitrate used when encoding destination file. (128, 256, 312k...)
@@ -83,14 +90,18 @@ class AudioSprite(object):
         id3v2_version (string)
             Set ID3v2 version for tags. (default: '4')
         """
+        # create save dir if necessary
+        if not os.path.exists(saveDir):
+            os.makedirs(saveDir)
+
         fileBase = os.path.join(saveDir, outfile)
 
-        if self._generateAudioSprite(fileBase, formats, bitrate, parameters, tags, id3v2_version): 
+        if self._generateAudioSprite(outfile, saveDir, formats, save_source, bitrate, parameters, tags, id3v2_version): 
             return self._generateDataFile(fileBase)
 
         return False
 
-    def _generateAudioSprite(self, fileBase, formats, bitrate, parameters, tags, id3v2_version):
+    def _generateAudioSprite(self, fileBase, saveDir, formats, save_source, bitrate, parameters, tags, id3v2_version):
         out = self._files[0]['seg']
 
         # concat all teh sounds!
@@ -101,8 +112,16 @@ class AudioSprite(object):
             return False
 
         for fmt in formats:
-            fname = os.path.join(fileBase + '.' + fmt)
+            os.makedirs(os.path.join(saveDir, fmt))
+            fname = os.path.join(saveDir, fmt, fileBase + '.' + fmt)
             out.export(fname, format=fmt, bitrate=bitrate, parameters=parameters, tags=tags, id3v2_version=id3v2_version) 
+            
+            # Export individual files to the output format if requested
+            if save_source:
+                for f in self._files:
+                    basename = os.path.splitext(os.path.basename(f['path']))[0]
+                    fname = os.path.join(saveDir, fmt, basename + '.' + fmt)
+                    f['seg'].export(fname, format=fmt, bitrate=bitrate, parameters=parameters, tags=tags, id3v2_version=id3v2_version)
 
         return True
 
@@ -120,6 +139,7 @@ class AudioSprite(object):
         for f in self._files:
             sound_data = self._getSoundData(f)
             sound_data['start'] = start
+            sound_data['end'] = start + len(f['seg'])
             data['sounds'].append(sound_data)
             start += len(f['seg'])
 
@@ -128,13 +148,14 @@ class AudioSprite(object):
     def _getSoundData(self, item):
         seg = item['seg']
 
-        return {'file': item['path'], 
+        return {'id': item['id'],
+                'url': item['path'], 
                 'duration': len(seg),
                 'duration_sec': seg.duration_seconds,
-                'channels': seg.channels,
-                'frame_rate': seg.frame_rate,
-                'frame_width': seg.frame_width,
-                'sample_width': seg.sample_width,
+                #'channels': seg.channels,
+                ##'frame_rate': seg.frame_rate,
+                #'frame_width': seg.frame_width,
+                #'sample_width': seg.sample_width,
                 'rms': seg.rms,
                 'dBFS': seg.dBFS,
                 'max': seg.max,
