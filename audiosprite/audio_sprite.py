@@ -34,7 +34,7 @@ class AudioSprite(object):
     def findIndexOf(self, path):
         return map(lambda f: f['path'], self).index(path)
 
-    def addAudio(self, filePath):
+    def addAudio(self, filePath, volume=None):
         """ Main interface for adding audio to the sprite.
         Takes any audio format that ffmpeg supports
         """
