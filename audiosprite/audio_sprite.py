@@ -12,18 +12,22 @@ class AudioSprite(object):
     """
 
     EXPORT_FORMATS = [
-        'ogg', 'mp3', 'mp4'
+        'ogg', 'mp3', 'aac', 'm4a'
     ]
+
+    SILENCE_DURATION = 1000
 
     def __init__(self, id, data=None, *args, **kwargs):
         self._data = data
         self._files = []
         self._id = id
+        self._useSilence = True
+        self._silenceDuration = self.SILENCE_DURATION
 
         super(AudioSprite, self).__init__(*args, **kwargs)
 
     def __len__(self):
-        return sum(len(f['seg']) for f in self._files)
+        return sum(len(f['seg']) for f in self._files if not self._isSilence(f))
     
     def __iter__(self):
         return (self._files[i] for i in xrange(len(self._files)))
@@ -44,6 +48,13 @@ class AudioSprite(object):
         except:
             raise InvalidSource("Invalid audio source: " + filePath)
 
+        # Add silence in between audio tracks
+        if (self._useSilence and len(self._files) > 0): 
+            self._files.append({
+                'id': 'SILENCE',
+                'length': self._calcSilenceLen()
+                })
+
         self._files.append({
             'id': os.path.splitext(os.path.basename(filePath))[0],
             'seg': seg, 
@@ -62,6 +73,11 @@ class AudioSprite(object):
             return self._files[idx]['seg'].rms
 
         return -1
+
+    def setSilence(self, onOrOff, duration=0):
+        self._useSilence = onOrOff
+        if duration > 0:
+            self._silenceDuration = duration
 
     def save(self, saveDir, outfile, formats=EXPORT_FORMATS, save_source=False, bitrate=None, parameters=None, tags=None, id3v2_version='4'):
         """ Generates audiosprite files and control data JSON file
@@ -106,7 +122,10 @@ class AudioSprite(object):
 
         # concat all teh sounds!
         for f in self._files[1:]:
-            out = out + f['seg']
+            if self._isSilence(f):
+                out = out + AudioSegment.silent(f['length'])
+            else:
+                out = out + f['seg']
 
         if (len(out) == 0):
             return False
@@ -125,6 +144,13 @@ class AudioSprite(object):
 
         return True
 
+    def _calcSilenceLen(self):
+        # TODO: Dynamic duration may be desired
+        return self._silenceDuration
+
+    def _isSilence(self, config):
+        return config['id'] == 'SILENCE'
+
     def _generateDataFile(self, fileBase):
         # generate the JSON data and write to file
         with open(fileBase + '.json', 'w') as outfile:
@@ -137,11 +163,15 @@ class AudioSprite(object):
         start = 0
 
         for f in self._files:
-            sound_data = self._getSoundData(f)
-            sound_data['start'] = start
-            sound_data['end'] = start + len(f['seg'])
-            data['sounds'].append(sound_data)
-            start += len(f['seg'])
+            if not self._isSilence(f):
+                sound_data = self._getSoundData(f)
+                sound_data['start'] = start
+                sound_data['end'] = start + len(f['seg'])
+                data['sounds'].append(sound_data)
+                start += len(f['seg'])
+            else:
+                # Add silence duration for next track's start time
+                start += f['length']
 
         return data
 
