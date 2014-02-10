@@ -24,6 +24,7 @@ class AudioSprite(object):
         self._id = id
         self._useSilence = True
         self._silenceDuration = self.SILENCE_DURATION
+        self._maxLevel = -1
 
         super(AudioSprite, self).__init__(*args, **kwargs)
 
@@ -38,6 +39,9 @@ class AudioSprite(object):
 
     def findIndexOf(self, path):
         return map(lambda f: f['path'], self).index(path)
+
+    def setMaxAudioLevel(self, level):
+        self._maxLevel = level
 
     def addAudio(self, filePath, volume=None):
         """ Main interface for adding audio to the sprite.
@@ -56,11 +60,21 @@ class AudioSprite(object):
                 'length': self._calcSilenceLen()
                 })
 
-        self._files.append({
+        config = {
             'id': os.path.splitext(os.path.basename(filePath))[0],
             'seg': seg, 
-            'path': filePath
-            })
+            'path': filePath,
+            'volume': volume,
+            'params': None
+            }
+
+        if volume != None:
+            config['vratio'] = self._getVolumeRatio(volume)
+            if config['vratio'] != None:
+                config['params'] = self._getAdjustedAudioVolumeParams(config['vratio'])
+
+        print "Added: " + str(config)
+        self._files.append(config)
 
     def changeFileVolume(self, file_path, volume_change):
         """
@@ -112,39 +126,63 @@ class AudioSprite(object):
             os.makedirs(saveDir)
 
         fileBase = os.path.join(saveDir, outfile)
-        #print "Outfile: " + fileBase
 
         if self._generateAudioSprite(outfile, saveDir, formats, save_source, bitrate, parameters, tags, id3v2_version): 
             return self._generateDataFile(fileBase)
 
         return False
 
+    def _getAdjustedAudioVolumeParams(self, ratio):
+        # First generate adjusted volume file with converter
+        # Then load the converted file back into memory and save it in our config
+        return '-af volume=' + str(ratio)
+
+
     def _generateAudioSprite(self, fileBase, saveDir, formats, save_source, bitrate, parameters, tags, id3v2_version):
-        out = self._files[0]['seg']
-
-        # concat all teh sounds!
-        for f in self._files[1:]:
-            if self._isSilence(f):
-                out = out + AudioSegment.silent(f['length'])
-            else:
-                out = out + f['seg']
-
-        if (len(out) == 0):
-            return False
 
         #print "formats: " + str(formats)
+        # Generate one sprite per audio format
         for fmt in formats:
-            os.makedirs(os.path.join(saveDir, fmt))
-            fname = os.path.join(saveDir, fmt, fileBase + '.' + fmt)
-            #print "Exporting to " + fname
-            out.export(fname, format=fmt, bitrate=bitrate, parameters=parameters, tags=tags, id3v2_version=id3v2_version) 
+            print "Converting format " + str(fmt)
             
             # Export individual files to the output format if requested
-            if save_source:
+            if True or save_source:
                 for f in self._realFiles():
+                    print "converting " + str(f)
                     basename = os.path.splitext(os.path.basename(f['path']))[0]
                     fname = os.path.join(saveDir, fmt, basename + '.' + fmt)
-                    f['seg'].export(fname, format=fmt, bitrate=bitrate, parameters=parameters, tags=tags, id3v2_version=id3v2_version)
+                    if not os.path.exists(os.path.dirname(fname)):
+                        os.makedirs(os.path.dirname(fname))
+
+                    # Convert wav->format with adjusted volume
+                    print "fname: " + fname
+                    print "params: " + str(f['params'])
+                    out = f['seg'].export(fname, format=fmt, bitrate=bitrate, parameters=f['params'], tags=tags, id3v2_version=id3v2_version)
+
+                    # out should contain the volume adjusted file converted to the target format
+                    print "*** Exported " + str(out.name) + '?'
+                    # If volume was adjusted, convert from adjusted volume file->wav
+                    if 'vratio' in f and f['vratio'] != None:
+                        try:
+                            f['seg'] = AudioSegment.from_file(out.name)
+                        except:
+                            raise Exception("Failed to load " + out.name)
+
+        # save 1st wav
+
+        print "Generating final sprites..."
+        for fmt in formats:
+            out = self._files[0]['seg']
+            # concat all teh sounds - they are volume adjusted already
+            for f in self._files[1:]:
+                if self._isSilence(f):
+                    out = out + AudioSegment.silent(f['length'])
+                else: 
+                    out = out + f['seg']
+
+            fname = os.path.join(saveDir, fmt, fileBase + '.' + fmt)
+            print "Exporting to " + fname
+            out.export(fname, format=fmt, bitrate=bitrate, parameters=parameters, tags=tags, id3v2_version=id3v2_version) 
 
         return True
 
@@ -157,6 +195,25 @@ class AudioSprite(object):
 
     def _isSilence(self, config):
         return config['id'] == 'SILENCE'
+
+    def _getVolumeRatio(self, volume):
+       # """ Sets the volume on an AudioSegment using an externally defined volume level
+       #  Requires setMaxAudioLevel() to have been called first!
+       # """
+
+       if self._maxLevel == -1:
+           raise "Attempting to set volume without a maximum level.  Call setMaxAudioLevel() first"
+
+       # Ignore if already at max
+       if volume == None or volume == self._maxLevel:
+           return None
+
+       # Figure out the scaled volume
+       ratio = (volume / float(self._maxLevel))
+       #  We want to do apply_gain(db_to_float(float(volume_change))))??
+       print "Adjusted rms: " + str(ratio)
+
+       return ratio
 
     def _generateDataFile(self, fileBase):
         # generate the JSON data and write to file

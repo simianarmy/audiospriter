@@ -175,6 +175,13 @@ class AudioSpriteTests(unittest.TestCase):
         print "sprite len = " + str(len(self.sprite))
         self.assertWithinRange(len(saved) - 1000, len(self.sprite) - 20, len(self.sprite) + 20)
 
+    def test_setting_volume_from_external_settings(self):
+        self.sprite.setMaxAudioLevel(100)
+        self.sprite.addAudio(os.path.join(data_dir, 'normalized.aiff'), volume=100)
+        self.sprite.addAudio(os.path.join(data_dir, 'quieter.aiff'), volume=15)
+        self.sprite.save(export_dir, self.testout, formats=['mp3'])
+        saved = self.load_audio('mp3')
+        self.assertEqual(saved.rms, self.sprite[0]['seg'].rms)
 
 if __name__ == "__main__":
     import sys
