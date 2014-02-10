@@ -6,13 +6,14 @@ from .exceptions import (
         InvalidSource
 )
 
+#ffmpeg -y -f mp3 -i test/data/test1.mp3 -c:a libfaac test1.aac
 class AudioSprite(object):
    
     """ Uses list of AudioSegment objects to maintain sprite
     """
 
     EXPORT_FORMATS = [
-        'ogg', 'mp3', 'aac', 'm4a'
+        'ogg', 'mp3', 'm4a'
     ]
 
     SILENCE_DURATION = 1000
@@ -27,7 +28,7 @@ class AudioSprite(object):
         super(AudioSprite, self).__init__(*args, **kwargs)
 
     def __len__(self):
-        return sum(len(f['seg']) for f in self._files if not self._isSilence(f))
+        return sum(len(f['seg']) for f in self._realFiles())
     
     def __iter__(self):
         return (self._files[i] for i in xrange(len(self._files)))
@@ -111,6 +112,7 @@ class AudioSprite(object):
             os.makedirs(saveDir)
 
         fileBase = os.path.join(saveDir, outfile)
+        #print "Outfile: " + fileBase
 
         if self._generateAudioSprite(outfile, saveDir, formats, save_source, bitrate, parameters, tags, id3v2_version): 
             return self._generateDataFile(fileBase)
@@ -130,19 +132,24 @@ class AudioSprite(object):
         if (len(out) == 0):
             return False
 
+        #print "formats: " + str(formats)
         for fmt in formats:
             os.makedirs(os.path.join(saveDir, fmt))
             fname = os.path.join(saveDir, fmt, fileBase + '.' + fmt)
+            #print "Exporting to " + fname
             out.export(fname, format=fmt, bitrate=bitrate, parameters=parameters, tags=tags, id3v2_version=id3v2_version) 
             
             # Export individual files to the output format if requested
             if save_source:
-                for f in self._files:
+                for f in self._realFiles():
                     basename = os.path.splitext(os.path.basename(f['path']))[0]
                     fname = os.path.join(saveDir, fmt, basename + '.' + fmt)
                     f['seg'].export(fname, format=fmt, bitrate=bitrate, parameters=parameters, tags=tags, id3v2_version=id3v2_version)
 
         return True
+
+    def _realFiles(self):
+        return filter(lambda f: not self._isSilence(f), self._files)
 
     def _calcSilenceLen(self):
         # TODO: Dynamic duration may be desired

@@ -95,6 +95,12 @@ class AudioSpriteTests(unittest.TestCase):
         for fmt in AudioSprite.EXPORT_FORMATS:
             self.assertTrue(self.sprite.save(export_dir, self.testout, formats=[fmt]))
 
+    def test_save_supports_m4a(self):
+        self.sprite.addAudio(os.path.join(data_dir, 'test3.mp3'))
+        self.assertTrue(self.sprite.save(export_dir, self.testout, formats=['m4a']))
+        saved = self.load_audio('m4a')
+        self.assertTrue(len(saved) > 0)
+
     def test_save_generates_datafile(self):
         self.sprite.addAudio(os.path.join(data_dir, 'bach.ogg'))
         self.sprite.addAudio(os.path.join(data_dir, 'test3.mp3'))
