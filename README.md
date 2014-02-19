@@ -5,13 +5,14 @@ Generates audio sprites in multiple formats with configurable sound levels
 
 Requirements
 ===
-Python 2.7.x or higher 
-pydub Python module 
-ffmpeg 
+* Python 2.7.x or higher
+* pydub Python module
+* ffmpeg
 
 ffmpeg
 ===
-If you want to support certain formats such as m4a, aac, ogg, etc. you will need those codecs compiled in to your ffmpeg binary.  You can find out which codecs are supported by running 
+If you want to support certain formats such as m4a, aac, ogg, etc. you will need those codecs compiled in to your ffmpeg binary.  You can find out which codecs are supported by running
+
   ffmpeg
   
 I support mp3, ogg/vorbis, m4a with the following ffmpeg configuration: 
